@@ -1,1 +1,121 @@
 #!/bin/bash
+
+arrsync=$(basename "$0")
+exec="npm exec --yes $arrsync@latest"
+
+usage() {
+    echo "Usage:"
+    echo "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]"
+    exit 1
+}
+
+while getopts ":sch:u:r:w:" arg; do
+    case $arg in
+    s)
+        [ "$mode" ] && usage
+        mode=s
+        ;;
+    c)
+        [ "$mode" ] && usage
+        mode=c
+        ;;
+    u)
+        user=$OPTARG
+        ;;
+    h)
+        host=$OPTARG
+        ;;
+    r)
+        read=$OPTARG
+        ;;
+    w)
+        write=$OPTARG
+        ;;
+    : | *)
+        usage
+        ;;
+    esac
+done
+
+asked=
+while ! {
+    [ "$mode" = s ] || [ "$mode" = S ] || [ "$mode" = c ] || [ "$mode" = C ]
+}; do
+    [ "$asked" ] && echo "Provide s for server, or c for client."
+    read -rp \
+        "Configure this node as a server, or as a client? [sc] : " \
+        mode
+    asked=true
+done
+
+if [ "$mode" = s ] || [ "$mode" = S ]; then
+    if ! which ssh-keygen >/dev/null; then
+        echo "ssh-keygen not found; can't continue"
+        exit 1
+    fi
+
+    if [ "$(whoami)" != root ]; then
+        echo "Insufficient privileges; restart with:"
+        opts="-s"
+        [ "$user" ] && opts+=" -u $user"
+        [ "$host" ] && opts+=" -h $host"
+        [ "$read" ] && opts+=" -r $read"
+        [ "$write" ] && opts+=" -w $write"
+        echo "sudo $exec $opts"
+        exit 1
+    fi
+
+    user_default=$arrsync
+    while ! [ "$user" ]; do
+        read -rp \
+            "Which user name to use for the $arrsync user? (default is $user_default) : " \
+            user
+        [ "$user" ] || user=$user_default
+        if id -u "user" >/dev/null 2>&1; then
+            user_exists=true
+            read -rp \
+                "User $user already exists; are you sure? [yN] : " \
+                sure
+            [ "$sure" ] || sure=n
+            if [ "$sure" = n ] || [ "$sure" = N ]; then
+                user=
+            fi
+        fi
+    done
+    if ! [ "$user_exists" ]; then
+        if ! which adduser >/dev/null; then
+            echo "adduser not found; can't continue"
+            exit 1
+        fi
+        echo "About to add the new user; you may press Enter to leave each user detail field"
+        echo "empty. Press any key to continue..."
+        read -rn 1
+        adduser --disabled-password "$user" || exit
+    fi
+
+    host_default=$HOSTNAME
+    [ "$host" ] || read -rp \
+        "Which host name to use for this server? (default is $host_default) : " \
+        host
+    [ "$host" ] || user=$host_default
+
+    read_default=127.0.0.1,127.0.0.2
+    [ "$read" ] || read -rp \
+        "Allow reading for which ip addresses? (default is $read_default) : " \
+        read
+    [ "$read" ] || read=$read_default
+
+    write_default=127.0.0.3,127.0.0.4
+    [ "$write" ] || read -rp \
+        "Allow writing for which ip addresses? (default is $write_default) : " \
+        write
+    [ "$write" ] || write=$write_default
+
+    su "$user" -c "
+        echo $read
+        exit
+    "
+fi
+
+if [ "$mode" = c ] || [ "$mode" = C ]; then
+fi
