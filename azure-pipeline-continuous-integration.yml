@@ -1,0 +1,66 @@
+trigger:
+- main
+
+pr:
+- none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+# Allow the pipeline to push directly to the protected branch, by explicitly
+# setting an admin user account, and a Personal Access Token as the password.
+# The token value is stored in our LastPass.
+- script: |
+    git remote set-url origin https://merkatorgis:$(GITHUB_PASSWORD)@github.com/merkatorgis/docker4gis.git
+  displayName: 'git login'
+
+# Test the authorisation for NPM, so that we know we can publish the package
+# we're updating. Using the environment variable placeholder in .npmrc; see
+# https://docs.npmjs.com/using-private-packages-in-a-ci-cd-workflow#create-and-check-in-a-project-specific-npmrc-file.
+- script: |
+    npm whoami
+  displayName: 'npm login'
+  env:
+    NPM_TOKEN: '$(NPM_TOKEN)'
+
+# Configure git with the pipeline's details.
+- script: |
+    git config --global user.email 'pipeline@azure.com'
+    git config --global user.name 'Azure Pipeline'
+  displayName: 'git config'
+
+# Prepare the git repo to accept commits.
+- script: |
+    git checkout -b main
+    git push --set-upstream origin main
+  displayName: 'git undo detached state'
+
+
+# Use npm to increment our version; see
+# https://docs.npmjs.com/cli/v9/commands/npm-version. Npm assumes semantic
+# versioning; we don't actually do that - instead, we just keep incrementing the
+# PATCH version (see https://semver.org). With git-tag-version set to false,
+# apparently npm version not only skips the tag, but also the commit.
+- script: |
+    npm config set git-tag-version false
+    version=$(npm version patch)
+    git add .
+    message="$version [skip ci]"
+    git commit -m "$message"
+    git tag -a "$version" -f -m "$message"
+  displayName: 'bump version'
+
+# Publish the npm package.
+- script: |
+    npm publish
+  displayName: 'npm publish'
+  env:
+    NPM_TOKEN: '$(NPM_TOKEN)'
+
+# Now that everything succeeded, push npm version's and our own changes back to
+# the original repo.
+- script: |
+    git push
+    git push --tags
+  displayName: 'git push version'
