@@ -12,7 +12,7 @@ steps:
 # setting an admin user account, and a Personal Access Token as the password.
 # The token value is stored in our LastPass.
 - script: |
-    git remote set-url origin https://merkatorgis:$(GITHUB_PASSWORD)@github.com/merkatorgis/docker4gis.git
+    git remote set-url origin https://merkatorgis:$(GITHUB_PASSWORD)@github.com/merkatorgis/arrsync.git
   displayName: 'git login'
 
 # Test the authorisation for NPM, so that we know we can publish the package
