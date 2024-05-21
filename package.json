@@ -1,0 +1,18 @@
+{
+  "name": "arrsync",
+  "version": "0.0.0",
+  "description": "Pirate-proof filetransfer with rrsync (restricted rsync). Created by https://www.merkator.com",
+  "bin": {
+    "arrsync": "arrsync"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/merkatorgis/arrsync.git"
+  },
+  "author": "Merkator B.V.",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/merkatorgis/arrsync/issues"
+  },
+  "homepage": "https://github.com/merkatorgis/arrsync#readme"
+}
