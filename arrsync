@@ -3,10 +3,14 @@
 arrsync=$(basename "$0")
 exec="npm exec --yes $arrsync@latest"
 
+error() {
+    echo "$1"
+    exit 1
+}
+
 usage() {
     echo "Usage:"
-    echo "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]"
-    exit 1
+    error "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]"
 }
 
 while getopts ":sch:u:r:w:" arg; do
@@ -49,10 +53,8 @@ while ! {
 done
 
 if [ "$mode" = s ] || [ "$mode" = S ]; then
-    if ! which ssh-keygen >/dev/null; then
-        echo "ssh-keygen not found; can't continue"
-        exit 1
-    fi
+    which ssh-keygen >/dev/null ||
+        error "ssh-keygen not found; can't continue"
 
     if [ "$(whoami)" != root ]; then
         echo "Insufficient privileges; restart with:"
@@ -61,8 +63,7 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
         [ "$host" ] && opts+=" -h $host"
         [ "$read" ] && opts+=" -r $read"
         [ "$write" ] && opts+=" -w $write"
-        echo "sudo $exec $opts"
-        exit 1
+        error "sudo $exec $opts"
     fi
 
     user_exists() {
@@ -85,16 +86,14 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
     user_default=$arrsync
     while ! [ "$user" ]; do
         read -rp \
-            "Which user name to use for the $arrsync user? (default is $user_default) : " \
+            "• Which user name to use for the $arrsync user? (default is $user_default) : " \
             user
         [ "$user" ] || user=$user_default
         user_sure
     done
     if ! user_exists; then
-        if ! which adduser >/dev/null; then
-            echo "Command adduser not found; can't continue"
-            exit 1
-        fi
+        which adduser >/dev/null ||
+            error "Command adduser not found; can't continue"
         echo "About to add the new user; you may press Enter to leave each user detail field"
         echo "empty. Press any key to continue..."
         read -rn 1
@@ -103,27 +102,57 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
 
     host_default=$HOSTNAME
     [ "$host" ] || read -rp \
-        "Which host name to use for this server? (default is $host_default) : " \
+        "• Which host name to use for this server? (default is $host_default) : " \
         host
     [ "$host" ] || user=$host_default
 
     read_default=127.0.0.1,127.0.0.2
     [ "$read" ] || read -rp \
-        "Allow reading for which ip addresses? (default is $read_default) : " \
+        "• Allow reading for which ip addresses? (default is $read_default) : " \
         read
     [ "$read" ] || read=$read_default
 
     write_default=127.0.0.3,127.0.0.4
     [ "$write" ] || read -rp \
-        "Allow writing for which ip addresses? (default is $write_default) : " \
+        "• Allow writing for which ip addresses? (default is $write_default) : " \
         write
     [ "$write" ] || write=$write_default
 
-    su "$user" -c "
-        echo $read
-        exit
-    "
+    # Since `su $user` is tricky from a script, we continue as root, and can't
+    # use ~ for the user's home directory. https://superuser.com/a/484330/462952
+    home=$(getent passwd "$user" | cut -d: -f6)
+    [ -d "$home" ] ||
+        error "Can't find home directory for user $user"
+
+    for mode in read write; do
+        # Create the needed files and directories.
+        mkdir -p "$home/$mode" "$home/.ssh"
+        chmod 700 "$home/$mode" "$home/.ssh"
+        ak=$home/.ssh/authorized_keys
+        touch "$ak"
+        chmod 600 "$ak"
+        # Generate a new public/private key pair.
+        echo "About to generate the $mode key pair. When asked for the passphrase (twice),"
+        echo "just hit Enter, since we need to have no passphrase."
+        echo "Press any key to continue..."
+        read -rn 1
+        key=$home/.ssh/$host-$user-$mode
+        ssh-keygen -o -a 100 -t ed25519 -f "$key" -C "$mode $user@$host"
+        # Have the files and directories owned by the $user.
+        chown "$user:$user" "$home/$mode" "$home/.ssh" "$ak" "$key" "$key.pub"
+        # Content of public key file.
+        pub=$(cat "$key".pub)
+        # First letter of $mode value.
+        rw=${mode:0:1}
+        # The value (a list of IPs) of the variable that is named as the value
+        # of mode (read or write).
+        from=${!mode}
+        # Restrict connections authenticating with this key.
+        echo "# Restricted ${mode}ing:" >>"$ak"
+        echo "command=\"rrsync -${rw}o $home/$mode\",from=\"$from\",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-x11-forwarding $pub" >>"$ak"
+    done
+
 fi
 
-if [ "$mode" = c ] || [ "$mode" = C ]; then
-fi
+# if [ "$mode" = c ] || [ "$mode" = C ]; then
+# fi
