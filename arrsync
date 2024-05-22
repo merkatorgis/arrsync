@@ -17,12 +17,12 @@ usage() {
 while getopts ":scu:h:p:r:w:" arg; do
     case $arg in
     s)
-        [ "$mode" ] && usage
-        mode=s
+        [ "$role" ] && usage
+        role=Server
         ;;
     c)
-        [ "$mode" ] && usage
-        mode=c
+        [ "$role" ] && usage
+        role=Client
         ;;
     u)
         user=$OPTARG
@@ -55,25 +55,24 @@ user() {
             "• $arrsync user name? (default is $default) : " \
             user
         [ "$user" ] || user=$default
-        [ "$mode" = s ] && user_sure
+        [ "$role" = Server ] && user_sure
     done
 }
 
 host() {
     local default
-    [ "$mode" = s ] && default=$HOSTNAME
+    [ "$role" = Server ] && default=$HOSTNAME
     [ "$default" ] && local default_message=" (default is $default)"
     while ! [ "$host" ]; do
         read -rp \
             "• $arrsync host name?$default_message : " \
             host
         [ "$host" ] || host=$default
-        [ "$mode" = c ] && host_sure
+        [ "$role" = Client ] && host_sure
     done
 }
 
-# Configure server.
-s() {
+Server() {
     which rrsync >/dev/null ||
         echo "Warning: command rrsync not found; is it installed?" >&2
 
@@ -162,8 +161,7 @@ s() {
     done
 }
 
-# Configure client.
-c() {
+Client() {
     user
 
     host_sure() {
@@ -184,51 +182,63 @@ c() {
 
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
+    temp_config=$(mktemp)
+
+    for mode in read write; do
+        # SSH config Host value.
+        Host=$host-$user-$mode
+        # SSH config IdentityFile value (the private key file).
+        IdentityFile=~/.ssh/$Host
+        # Configure a mode-specific Host entry.
+        {
+            echo
+            echo "Host $Host"
+            echo "    IdentityFile $IdentityFile"
+        } >>"$temp_config"
+
+        # Collect the key file content (in a temporary file, to prevent having
+        # to empty an existing key file before writing new lines to it, ending
+        # up with an empty file when the user would press Ctrl-C, instead of
+        # preserving the original content).
+        temp_key=$(mktemp)
+        echo "• Paste the contents (from the server) of the _private_ key file"
+        echo -n "  $Host : "
+        while true; do
+            read -rs
+            [ "$REPLY" ] || break
+            echo "$REPLY" >>"$temp_key"
+        done
+        echo
+        # Write the collected key content (if any).
+        [ -s "$temp_key" ] && cat "$temp_key" >"$IdentityFile"
+        rm "$temp_key"
+        touch "$IdentityFile"
+        chmod 600 "$IdentityFile"
+        [ -s "$IdentityFile" ] ||
+            echo "Notice: private key file $IdentityFile is empty." >&2
+    done
+
+    # Write the SSH config.
     config=~/.ssh/config
-    # Configure a generic Host entry.
+    [ -s "$config" ] || empty=true
     {
+        # Configure a general wildcard Host entry with common settings.
+        [ "$empty" ] || echo
         echo "Host $host-$user-*"
         echo "    User $user"
         echo "    HostName $host"
         echo "    Port $port"
+        # Write the collected mode-specific Host entries.
+        cat "$temp_config"
     } >>"$config"
+    rm "$temp_config"
     chmod 600 "$config"
-
-    for mode in read write; do
-        # SSH config Host value.
-        config_host=$host-$user-$mode
-        # Key file name.
-        key=~/.ssh/$config_host
-        # Empty the key file.
-        echo -n '' >"$key"
-        # Write the key file content.
-        echo "• Paste the contents (from the server) of the _private_ key file"
-        echo -n "  $config_host : "
-        while true; do
-            read -rs
-            [ "$REPLY" ] || break
-            echo "$REPLY" >>"$key"
-        done
-        echo
-        # Configure a mode-specific Host entry.
-        {
-            echo "Host $config_host"
-            echo "    IdentityFile $key"
-        } >>"$config"
-        chmod 600 "$key"
-    done
 }
 
-asked=
-while ! {
-    [ "$mode" = s ] || [ "$mode" = c ]
-}; do
-    [ "$asked" ] && echo "Enter s for server, or c for client." >&2
-    read -rp "Configure this node as a server, or as a client? [sc] : "
-    # To lowercase.
-    mode=${REPLY,,}
-    asked=true
+PS3="Select this node's role (type the number) : "
+[ "$role" ] || select role in Server Client; do
+    [ "$role" ] && break
 done
 
 # Run the s or the c function.
-$mode
+$role
