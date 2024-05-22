@@ -45,18 +45,8 @@ while getopts ":scu:h:p:r:w:" arg; do
     esac
 done
 
-asked=
-while ! {
-    [ "$mode" = s ] || [ "$mode" = c ]
-}; do
-    [ "$asked" ] && echo "Enter s for server, or c for client." >&2
-    read -rp \
-        "Configure this node as a server, or as a client? [sc] : " \
-        mode
-    # To lowercase.
-    mode=${mode,,}
-    asked=true
-done
+which rsync >/dev/null ||
+    echo "Warning: command rsync not found; is it installed?" >&2
 
 user() {
     local default=$arrsync
@@ -83,12 +73,15 @@ host() {
 }
 
 # Configure server.
-if [ "$mode" = s ]; then
+s() {
+    which rrsync >/dev/null ||
+        echo "Warning: command rrsync not found; is it installed?" >&2
+
     which ssh-keygen >/dev/null ||
         error "Error: command ssh-keygen not found; is the ssh client installed?"
 
     if [ "$(whoami)" != root ]; then
-        echo "Insufficient privileges; restart with:" >&2
+        echo "Insufficient privileges; restart with sudo:" >&2
         opts="-s"
         [ "$user" ] && opts+=" -u $user"
         [ "$host" ] && opts+=" -h $host"
@@ -116,7 +109,7 @@ if [ "$mode" = s ]; then
             error "Error: command adduser not found"
         echo "About to add the new user; you may press Enter to leave each user detail field"
         echo "empty. Press any key to continue..."
-        read -rn 1
+        read -rsn 1
         adduser --disabled-password "$user" || exit
     fi
 
@@ -151,7 +144,7 @@ if [ "$mode" = s ]; then
         echo "About to generate the $mode key pair. When asked for the passphrase (twice),"
         echo "just hit Enter, since we need to have no passphrase."
         echo "Press any key to continue..."
-        read -rn 1
+        read -rsn 1
         key=$home/.ssh/$host-$user-$mode
         ssh-keygen -o -a 100 -t ed25519 -f "$key" -C "$mode $user@$host" || exit
         # Have the files and directories owned by the $user.
@@ -167,11 +160,10 @@ if [ "$mode" = s ]; then
         echo "# Restricted ${mode}ing:" >>"$ak"
         echo "command=\"rrsync -${rw}o $home/$mode\",from=\"$from\",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-x11-forwarding $pub" >>"$ak"
     done
-
-fi
+}
 
 # Configure client.
-if [ "$mode" = c ]; then
+c() {
     user
 
     host_sure() {
@@ -189,4 +181,54 @@ if [ "$mode" = c ]; then
     }
     port=${port:-22}
     host
-fi
+
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    config=~/.ssh/config
+    # Configure a generic Host entry.
+    {
+        echo "Host $host-$user-*"
+        echo "    User $user"
+        echo "    HostName $host"
+        echo "    Port $port"
+    } >>"$config"
+    chmod 600 "$config"
+
+    for mode in read write; do
+        # SSH config Host value.
+        config_host=$host-$user-$mode
+        # Key file name.
+        key=~/.ssh/$config_host
+        # Empty the key file.
+        echo -n '' >"$key"
+        # Write the key file content.
+        echo "• Paste the contents (from the server) of the _private_ key file"
+        echo -n "  $config_host : "
+        while true; do
+            read -rs
+            [ "$REPLY" ] || break
+            echo "$REPLY" >>"$key"
+        done
+        echo
+        # Configure a mode-specific Host entry.
+        {
+            echo "Host $config_host"
+            echo "    IdentityFile $key"
+        } >>"$config"
+        chmod 600 "$key"
+    done
+}
+
+asked=
+while ! {
+    [ "$mode" = s ] || [ "$mode" = c ]
+}; do
+    [ "$asked" ] && echo "Enter s for server, or c for client." >&2
+    read -rp "Configure this node as a server, or as a client? [sc] : "
+    # To lowercase.
+    mode=${REPLY,,}
+    asked=true
+done
+
+# Run the s or the c function.
+$mode
