@@ -71,7 +71,7 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
             "Which user name to use for the $arrsync user? (default is $user_default) : " \
             user
         [ "$user" ] || user=$user_default
-        if id -u "user" >/dev/null 2>&1; then
+        if id -u "$user" >/dev/null 2>&1; then
             user_exists=true
             read -rp \
                 "User $user already exists; are you sure? [yN] : " \
