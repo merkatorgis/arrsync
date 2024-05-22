@@ -4,16 +4,17 @@ arrsync=$(basename "$0")
 exec="npm exec --yes $arrsync@latest"
 
 error() {
-    echo "$1"
+    echo "$1" >&2
     exit 1
 }
 
 usage() {
-    echo "Usage:"
-    error "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]"
+    echo "Usage:" >&2
+    echo "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]" >&2
+    error "Client: $exec [-c] [-u USER] [-h HOST] [-p PORT]"
 }
 
-while getopts ":sch:u:r:w:" arg; do
+while getopts ":scu:h:p:r:w:" arg; do
     case $arg in
     s)
         [ "$mode" ] && usage
@@ -29,6 +30,9 @@ while getopts ":sch:u:r:w:" arg; do
     h)
         host=$OPTARG
         ;;
+    p)
+        port=$OPTARG
+        ;;
     r)
         read=$OPTARG
         ;;
@@ -43,21 +47,48 @@ done
 
 asked=
 while ! {
-    [ "$mode" = s ] || [ "$mode" = S ] || [ "$mode" = c ] || [ "$mode" = C ]
+    [ "$mode" = s ] || [ "$mode" = c ]
 }; do
-    [ "$asked" ] && echo "Enter s for server, or c for client."
+    [ "$asked" ] && echo "Enter s for server, or c for client." >&2
     read -rp \
         "Configure this node as a server, or as a client? [sc] : " \
         mode
+    # To lowercase.
+    mode=${mode,,}
     asked=true
 done
 
-if [ "$mode" = s ] || [ "$mode" = S ]; then
+user() {
+    local default=$arrsync
+    while ! [ "$user" ]; do
+        read -rp \
+            "• $arrsync user name? (default is $default) : " \
+            user
+        [ "$user" ] || user=$default
+        [ "$mode" = s ] && user_sure
+    done
+}
+
+host() {
+    local default
+    [ "$mode" = s ] && default=$HOSTNAME
+    [ "$default" ] && local default_message=" (default is $default)"
+    while ! [ "$host" ]; do
+        read -rp \
+            "• $arrsync host name?$default_message : " \
+            host
+        [ "$host" ] || host=$default
+        [ "$mode" = c ] && host_sure
+    done
+}
+
+# Configure server.
+if [ "$mode" = s ]; then
     which ssh-keygen >/dev/null ||
-        error "ssh-keygen not found; can't continue"
+        error "Error: command ssh-keygen not found; is the ssh client installed?"
 
     if [ "$(whoami)" != root ]; then
-        echo "Insufficient privileges; restart with:"
+        echo "Insufficient privileges; restart with:" >&2
         opts="-s"
         [ "$user" ] && opts+=" -u $user"
         [ "$host" ] && opts+=" -h $host"
@@ -71,50 +102,35 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
     }
 
     user_sure() {
-        if user_exists; then
-            read -rp \
-                "User $user already exists; continue anyway? [yN] : " \
-                sure
-            if [ "$sure" != y ] && [ "$sure" != Y ]; then
-                user=
-            fi
-        fi
+        user_exists || return
+        read -rp \
+            "User $user already exists; continue anyway? [yN] : " \
+            sure
+        [ "${sure,,}" = y ] || user=
     }
 
     user_sure
-
-    user_default=$arrsync
-    while ! [ "$user" ]; do
-        read -rp \
-            "• Which user name to use for the $arrsync user? (default is $user_default) : " \
-            user
-        [ "$user" ] || user=$user_default
-        user_sure
-    done
+    user
     if ! user_exists; then
         which adduser >/dev/null ||
-            error "Command adduser not found; can't continue"
+            error "Error: command adduser not found"
         echo "About to add the new user; you may press Enter to leave each user detail field"
         echo "empty. Press any key to continue..."
         read -rn 1
         adduser --disabled-password "$user" || exit
     fi
 
-    host_default=$HOSTNAME
-    [ "$host" ] || read -rp \
-        "• Which host name to use for this server? (default is $host_default) : " \
-        host
-    [ "$host" ] || user=$host_default
+    host
 
     read_default=127.0.0.1,127.0.0.2
     [ "$read" ] || read -rp \
-        "• Allow reading for which ip addresses? (default is $read_default) : " \
+        "• IP address to grant read access? (default is $read_default) : " \
         read
     [ "$read" ] || read=$read_default
 
     write_default=127.0.0.3,127.0.0.4
     [ "$write" ] || read -rp \
-        "• Allow writing for which ip addresses? (default is $write_default) : " \
+        "• IP address to grant write access? (default is $write_default) : " \
         write
     [ "$write" ] || write=$write_default
 
@@ -122,7 +138,7 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
     # use ~ for the user's home directory. https://superuser.com/a/484330/462952
     home=$(getent passwd "$user" | cut -d: -f6)
     [ -d "$home" ] ||
-        error "Can't find home directory for user $user"
+        error "Error: can't find home directory for user $user"
 
     for mode in read write; do
         # Create the needed files and directories.
@@ -137,7 +153,7 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
         echo "Press any key to continue..."
         read -rn 1
         key=$home/.ssh/$host-$user-$mode
-        ssh-keygen -o -a 100 -t ed25519 -f "$key" -C "$mode $user@$host"
+        ssh-keygen -o -a 100 -t ed25519 -f "$key" -C "$mode $user@$host" || exit
         # Have the files and directories owned by the $user.
         chown "$user:$user" "$home/$mode" "$home/.ssh" "$ak" "$key" "$key.pub"
         # Content of public key file.
@@ -154,5 +170,23 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
 
 fi
 
-# if [ "$mode" = c ] || [ "$mode" = C ]; then
-# fi
+# Configure client.
+if [ "$mode" = c ]; then
+    user
+
+    host_sure() {
+        [ "$host" ] ||
+            return
+        which ssh-keyscan >/dev/null ||
+            echo "Warning: command ssh-keyscan not found; is the ssh client installed?" >&2
+        ssh-keyscan "$host" -p "$port" >/dev/null 2>&1 &&
+            return
+        read -rp \
+            "SSH not answering at $host:$port; continue anyway? [yN] : " \
+            sure
+        [ "${sure,,}" = y ] ||
+            host=
+    }
+    port=${port:-22}
+    host
+fi
