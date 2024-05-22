@@ -41,7 +41,7 @@ asked=
 while ! {
     [ "$mode" = s ] || [ "$mode" = S ] || [ "$mode" = c ] || [ "$mode" = C ]
 }; do
-    [ "$asked" ] && echo "Provide s for server, or c for client."
+    [ "$asked" ] && echo "Enter s for server, or c for client."
     read -rp \
         "Configure this node as a server, or as a client? [sc] : " \
         mode
@@ -65,26 +65,34 @@ if [ "$mode" = s ] || [ "$mode" = S ]; then
         exit 1
     fi
 
+    user_exists() {
+        id -u "$user" >/dev/null 2>&1
+    }
+
+    user_sure() {
+        if user_exists; then
+            read -rp \
+                "User $user already exists; continue anyway? [yN] : " \
+                sure
+            if [ "$sure" != y ] && [ "$sure" != Y ]; then
+                user=
+            fi
+        fi
+    }
+
+    user_sure
+
     user_default=$arrsync
     while ! [ "$user" ]; do
         read -rp \
             "Which user name to use for the $arrsync user? (default is $user_default) : " \
             user
         [ "$user" ] || user=$user_default
-        if id -u "$user" >/dev/null 2>&1; then
-            user_exists=true
-            read -rp \
-                "User $user already exists; are you sure? [yN] : " \
-                sure
-            [ "$sure" ] || sure=n
-            if [ "$sure" = n ] || [ "$sure" = N ]; then
-                user=
-            fi
-        fi
+        user_sure
     done
-    if ! [ "$user_exists" ]; then
+    if ! user_exists; then
         if ! which adduser >/dev/null; then
-            echo "adduser not found; can't continue"
+            echo "Command adduser not found; can't continue"
             exit 1
         fi
         echo "About to add the new user; you may press Enter to leave each user detail field"
