@@ -1,21 +1,43 @@
 #!/bin/bash
 
 arrsync=$(basename "$0")
-exec="npm exec --yes $arrsync@latest"
+exec="npm exec $arrsync"
+base=$(dirname "$0")
+[ "$(basename "$base")" = .bin ] && base=$base/../$arrsync
+base=$(realpath "$base")
+
+err() {
+    echo "$*" >&2
+}
+
+notice() {
+    err "Notice: $*"
+}
+
+warning() {
+    err "Warning: $*"
+}
 
 error() {
-    echo "$1" >&2
+    [ "$1" ] && err "Error: $*"
     exit 1
 }
 
 usage() {
-    echo "Usage:" >&2
-    echo "Server: sudo $exec [-s] [-u USER] [-h HOST] [-r READ] [-w WRITE]" >&2
-    error "Client: $exec [-c] [-u USER] [-h HOST] [-p PORT]"
+    export exec
+    envsubst <"$base/usage" >&2
+    exit "${1:-1}"
 }
 
-while getopts ":scu:h:p:r:w:" arg; do
+while getopts ":tHscu:h:p:r:w:" arg; do
     case $arg in
+    t)
+        # -t = trace; for debugging
+        set -x
+        ;;
+    H)
+        usage 0
+        ;;
     s)
         [ "$role" ] && usage
         role=Server
@@ -46,7 +68,7 @@ while getopts ":scu:h:p:r:w:" arg; do
 done
 
 which rsync >/dev/null ||
-    echo "Warning: command rsync not found; is it installed?" >&2
+    warning "command rsync not found; is it installed?"
 
 user() {
     local default=$arrsync
@@ -73,20 +95,24 @@ host() {
 }
 
 Server() {
-    which rrsync >/dev/null ||
-        echo "Warning: command rrsync not found; is it installed?" >&2
-
     which ssh-keygen >/dev/null ||
-        error "Error: command ssh-keygen not found; is the ssh client installed?"
+        error "command ssh-keygen not found; is the ssh client installed?"
+
+    which sshd >/dev/null ||
+        warning "command sshd not found; is the ssh server installed?"
+
+    which rrsync >/dev/null ||
+        warning "command rrsync not found; is it installed?"
 
     if [ "$(whoami)" != root ]; then
-        echo "Insufficient privileges; restart with sudo:" >&2
+        err "Insufficient privileges; restart with sudo:"
         opts="-s"
         [ "$user" ] && opts+=" -u $user"
         [ "$host" ] && opts+=" -h $host"
         [ "$read" ] && opts+=" -r $read"
         [ "$write" ] && opts+=" -w $write"
-        error "sudo $exec $opts"
+        err "sudo $exec $opts"
+        error
     fi
 
     user_exists() {
@@ -105,7 +131,7 @@ Server() {
     user
     if ! user_exists; then
         which adduser >/dev/null ||
-            error "Error: command adduser not found"
+            error "command adduser not found"
         echo "About to add the new user; you may press Enter to leave each user detail field"
         echo "empty. Press any key to continue..."
         read -rsn 1
@@ -130,7 +156,7 @@ Server() {
     # use ~ for the user's home directory. https://superuser.com/a/484330/462952
     home=$(getent passwd "$user" | cut -d: -f6)
     [ -d "$home" ] ||
-        error "Error: can't find home directory for user $user"
+        error "can't find home directory for user $user"
 
     for mode in read write; do
         # Create the needed files and directories.
@@ -168,7 +194,7 @@ Client() {
         [ "$host" ] ||
             return
         which ssh-keyscan >/dev/null ||
-            echo "Warning: command ssh-keyscan not found; is the ssh client installed?" >&2
+            warning "command ssh-keyscan not found; is the ssh client installed?"
         ssh-keyscan "$host" -p "$port" >/dev/null 2>&1 &&
             return
         read -rp \
@@ -210,12 +236,16 @@ Client() {
         done
         echo
         # Write the collected key content (if any).
-        [ -s "$temp_key" ] && cat "$temp_key" >"$IdentityFile"
+        if [ -s "$temp_key" ]; then
+            cat "$temp_key" >"$IdentityFile"
+            [ "$mode" = read ] &&
+                echo "Download files with e.g. rsync -avz $Host: ."
+            [ "$mode" = write ] &&
+                echo "Upload files with e.g. rsync -avz . $Host:"
+        fi
         rm "$temp_key"
         touch "$IdentityFile"
         chmod 600 "$IdentityFile"
-        [ -s "$IdentityFile" ] ||
-            echo "Notice: private key file $IdentityFile is empty." >&2
     done
 
     # Write the SSH config.
@@ -235,10 +265,14 @@ Client() {
     chmod 600 "$config"
 }
 
-PS3="Select this node's role (type the number) : "
-[ "$role" ] || select role in Server Client; do
+Help() {
+    usage 0
+}
+
+PS3="Select this node's role to configure, or Help for help (type the number) : "
+[ "$role" ] || select role in Server Client Help; do
     [ "$role" ] && break
 done
 
-# Run the s or the c function.
+# Run the function named as the selected role value (Server, Client, or Help).
 $role
