@@ -1,31 +1,29 @@
 #!/bin/bash
 
 arrsync=$(basename "$0")
-exec="npm exec $arrsync"
+exec="npm exec $arrsync@latest"
 base=$(dirname "$0")
 [ "$(basename "$base")" = .bin ] && base=$base/../$arrsync
 base=$(realpath "$base")
 
-err() {
-    echo "$*" >&2
+get_version() {
+    (
+        cd "$base" || exit
+        npm pkg get version
+    )
 }
 
-notice() {
-    err "Notice: $*"
+version=
+version() {
+    version=${version:-$(get_version)}
+    echo "$arrsync version $version"
 }
 
-warning() {
-    err "Warning: $*"
-}
-
-error() {
-    [ "$1" ] && err "Error: $*"
-    exit 1
-}
+version
 
 usage() {
     export exec
-    envsubst <"$base/usage" >&2
+    envsubst <"$base/usage"
     exit "${1:-1}"
 }
 
@@ -71,6 +69,23 @@ while getopts ":tHksch:u:p:r:w:" arg; do
         ;;
     esac
 done
+
+err() {
+    echo "$*" >&2
+}
+
+notice() {
+    err "Notice: $*"
+}
+
+warning() {
+    err "Warning: $*"
+}
+
+error() {
+    [ "$1" ] && err "Error: $*"
+    exit 1
+}
 
 which rsync >/dev/null ||
     warning "command rsync not found; is it installed?"
@@ -200,7 +215,7 @@ Server() {
         # of mode (read or write).
         from=${!mode}
         # Restrict connections authenticating with this key.
-        echo "# Restricted ${mode}ing:" >>"$ak"
+        echo "# Restricted ${mode}ing - $(version):" >>"$ak"
         echo "command=\"rrsync -${rw}o $home/$mode\",from=\"$from\",no-agent-forwarding,no-port-forwarding,no-pty,no-user-rc,no-x11-forwarding $pub" >>"$ak"
     done
 }
@@ -236,6 +251,7 @@ Client() {
         # Configure a mode-specific Host entry.
         {
             echo
+            echo "# $(version)"
             echo "Host $Host"
             echo "    IdentityFile $IdentityFile"
         } >>"$temp_config"
@@ -272,6 +288,7 @@ Client() {
     {
         # Configure a general wildcard Host entry with common settings.
         [ "$empty" ] || echo
+        echo "# $(version)"
         echo "Host $host-$user-*"
         echo "    User $user"
         echo "    HostName $host"
@@ -306,14 +323,6 @@ Quit() {
     exit 0
 }
 
-version() {
-    (
-        cd "$base" || exit
-        npm pkg get version
-    )
-}
-
-echo "$arrsync version $(version)"
 PS3="Select an action (type the number) : "
 [ "$action" ] || select action in \
     'Configure Server' \
