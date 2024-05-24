@@ -1,0 +1,29 @@
+Configures the Server or the Client side of a secure channel for file transfer.
+Start with the Server side.
+
+Usage:
+• Configure Server: sudo $exec [-s] [-h HOST] [-u USER] [-r READ] [-w WRITE]
+  -s is for Server
+  -h sets the host name of this server to which the clients will connect.
+  -u sets the name of the user as which clients will connect. A new user is
+     created if it doesn't exist.
+  -r sets the list of client IP addresses that are allowed to read files from
+     this server, e.g. 127.0.0.1,127.0.0.2
+  -w sets the list of client IP addresses that are allowed to write files to
+     this server, e.g. 127.0.0.3,127.0.0.4
+• Configure Client: $exec [-c] [-h HOST] [-u USER] [-p PORT]
+  -c is for Client
+  -h sets the host name of the server to connect to.
+  -u sets the name of the user as which to connect.
+  -p sets the port number where the SSH is listening on the server.
+• List private key contents: $exec [-k] [-h HOST] [-u USER]
+• Help: $exec [-H]
+All options are optional; if not present, input will be requested interactively,
+except for -p, for which the default value is 22.
+
+Once both Server and Client are configured, the Client can download files from
+and/or upload files to the server.
+• To download all files to the current directory (.):
+  rsync -avz HOST-USER-read: .
+• To upload all files from the current directory (.):
+  rsync -avz . HOST-USER-write:
