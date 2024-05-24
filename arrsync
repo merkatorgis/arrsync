@@ -29,28 +29,33 @@ usage() {
     exit "${1:-1}"
 }
 
-while getopts ":tHscu:h:p:r:w:" arg; do
+while getopts ":tHksch:u:p:r:w:" arg; do
     case $arg in
     t)
         # -t = trace; for debugging
         set -x
         ;;
     H)
-        usage 0
+        [ "$action" ] && usage
+        action=Help
+        ;;
+    k)
+        [ "$action" ] && usage
+        action=Keys
         ;;
     s)
-        [ "$role" ] && usage
-        role=Server
+        [ "$action" ] && usage
+        action=Server
         ;;
     c)
-        [ "$role" ] && usage
-        role=Client
-        ;;
-    u)
-        user=$OPTARG
+        [ "$action" ] && usage
+        action=Client
         ;;
     h)
         host=$OPTARG
+        ;;
+    u)
+        user=$OPTARG
         ;;
     p)
         port=$OPTARG
@@ -70,28 +75,50 @@ done
 which rsync >/dev/null ||
     warning "command rsync not found; is it installed?"
 
+host() {
+    local default
+    [ "$action" = Server ] && default=$HOSTNAME
+    [ "$default" ] && local default_message=" (default is $default)"
+    while ! [ "$host" ]; do
+        read -rp \
+            "• $arrsync Server host name?$default_message : " \
+            host
+        [ "$host" ] || host=$default
+        [ "$action" = Client ] && host_sure
+    done
+}
+
 user() {
     local default=$arrsync
     while ! [ "$user" ]; do
         read -rp \
-            "• $arrsync user name? (default is $default) : " \
+            "• $arrsync Server user name? (default is $default) : " \
             user
         [ "$user" ] || user=$default
-        [ "$role" = Server ] && user_sure
+        [ "$action" = Server ] && user_sure
     done
 }
 
-host() {
-    local default
-    [ "$role" = Server ] && default=$HOSTNAME
-    [ "$default" ] && local default_message=" (default is $default)"
-    while ! [ "$host" ]; do
-        read -rp \
-            "• $arrsync host name?$default_message : " \
-            host
-        [ "$host" ] || host=$default
-        [ "$role" = Client ] && host_sure
-    done
+root() {
+    if [ "$(whoami)" != root ]; then
+        err "Insufficient privileges; restart with sudo:"
+        opts="-s"
+        [ "$user" ] && opts+=" -u $user"
+        [ "$host" ] && opts+=" -h $host"
+        [ "$read" ] && opts+=" -r $read"
+        [ "$write" ] && opts+=" -w $write"
+        err "sudo $exec $opts"
+        error
+    fi
+}
+
+home() {
+    # Since `su $user` is tricky from a script, we run everything as root, and
+    # can't use ~ for the user's home directory.
+    # https://superuser.com/a/484330/462952
+    home=$(getent passwd "$user" | cut -d: -f6)
+    [ -d "$home" ] ||
+        error "can't find home directory for user $user"
 }
 
 Server() {
@@ -104,16 +131,9 @@ Server() {
     which rrsync >/dev/null ||
         warning "command rrsync not found; is it installed?"
 
-    if [ "$(whoami)" != root ]; then
-        err "Insufficient privileges; restart with sudo:"
-        opts="-s"
-        [ "$user" ] && opts+=" -u $user"
-        [ "$host" ] && opts+=" -h $host"
-        [ "$read" ] && opts+=" -r $read"
-        [ "$write" ] && opts+=" -w $write"
-        err "sudo $exec $opts"
-        error
-    fi
+    root
+
+    host
 
     user_exists() {
         id -u "$user" >/dev/null 2>&1
@@ -138,8 +158,6 @@ Server() {
         adduser --disabled-password "$user" || exit
     fi
 
-    host
-
     read_default=127.0.0.1,127.0.0.2
     [ "$read" ] || read -rp \
         "• IP address to grant read access? (default is $read_default) : " \
@@ -152,11 +170,7 @@ Server() {
         write
     [ "$write" ] || write=$write_default
 
-    # Since `su $user` is tricky from a script, we continue as root, and can't
-    # use ~ for the user's home directory. https://superuser.com/a/484330/462952
-    home=$(getent passwd "$user" | cut -d: -f6)
-    [ -d "$home" ] ||
-        error "can't find home directory for user $user"
+    home
 
     for mode in read write; do
         # Create the needed files and directories.
@@ -166,6 +180,7 @@ Server() {
         touch "$ak"
         chmod 600 "$ak"
         # Generate a new public/private key pair.
+        echo
         echo "About to generate the $mode key pair. When asked for the passphrase (twice),"
         echo "just hit Enter, since we need to have no passphrase."
         echo "Press any key to continue..."
@@ -174,6 +189,9 @@ Server() {
         ssh-keygen -o -a 100 -t ed25519 -f "$key" -C "$mode $user@$host" || exit
         # Have the files and directories owned by the $user.
         chown "$user:$user" "$home/$mode" "$home/.ssh" "$ak" "$key" "$key.pub"
+        echo
+        echo "To list the $mode private key contents (needed on Client configuration):"
+        echo "  sudo cat '$key'"
         # Content of public key file.
         pub=$(cat "$key".pub)
         # First letter of $mode value.
@@ -188,8 +206,6 @@ Server() {
 }
 
 Client() {
-    user
-
     host_sure() {
         [ "$host" ] ||
             return
@@ -205,6 +221,8 @@ Client() {
     }
     port=${port:-22}
     host
+
+    user
 
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
@@ -258,6 +276,8 @@ Client() {
         echo "    User $user"
         echo "    HostName $host"
         echo "    Port $port"
+        echo "    PreferredAuthentications publickey"
+        echo "    PasswordAuthentication no"
         # Write the collected mode-specific Host entries.
         cat "$temp_config"
     } >>"$config"
@@ -265,14 +285,48 @@ Client() {
     chmod 600 "$config"
 }
 
+Keys() {
+    root
+    user
+    home
+    host
+    for mode in read write; do
+        echo
+        echo "$mode":
+        key=$home/.ssh/$host-$user-$mode
+        cat "$key"
+    done
+}
+
 Help() {
     usage 0
 }
 
-PS3="Select this node's role to configure, or Help for help (type the number) : "
-[ "$role" ] || select role in Server Client Help; do
-    [ "$role" ] && break
+PS3="Select an action (type the number) : "
+[ "$action" ] || select action in \
+    'Configure Server' \
+    'Configure Client' \
+    'List private key contents' \
+    'Help'; do
+    case $REPLY in
+    1)
+        action=Server
+        ;;
+    2)
+        action=Client
+        ;;
+    3)
+        action=Keys
+        ;;
+    4)
+        action=Help
+        ;;
+    *)
+        action=
+        ;;
+    esac
+    [ "$action" ] && break
 done
 
-# Run the function named as the selected role value (Server, Client, or Help).
-$role
+# Run the function named as the selected action value.
+$action
