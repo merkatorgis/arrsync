@@ -119,7 +119,7 @@ lists of IP addresses for Read and Write access.
 
 ## 2. Configure the Client(s)
 
-On each Client, again just run:
+On each Client, just run:
 
 ```
 npm exec arrsync@latest
@@ -217,4 +217,4 @@ version, and if so, installs it and use that version.
 
 It's important to configure both the Server and its Clients with the same
 version of arrsync. You may choose to target a specific version, e.g. `npm exec
-arrsync@0.0.4`.
+arrsync@0.0.7`.
