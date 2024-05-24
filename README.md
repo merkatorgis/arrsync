@@ -83,15 +83,17 @@ https://download.samba.org/pub/rsync/rrsync.1.
 On the Server, just run:
 
 ```
-sudo npm exec arrsync@latest -s
+sudo npm exec arrsync@latest
 ```
+
+And choose the Configure Server menu item.
 
 Sudo is needed since we configure things for a another user (normally even a new
 user, that the tool will create for you).
 
 You'll be prompted to provide the needed configuration values. Alternatively,
 all variables can be passed as command options. See the [usage](./usage) file
-for details, or run `npm exec arrsync@latest -H` for help.
+for details, or run arrsync and choose Help menu item.
 
 You'll be asked to provide a list of the (public) **IP addresses of the Client
 nodes** that you want to allow Read access, and a second list of addresses for
@@ -101,7 +103,8 @@ Two **public/private key pairs** are generated (one to Read and one to Write).
 You'll need the contents of the _private_ key files when configuring the
 Clients, which you can find through `sudo cat <user's
 home>/.ssh/$host-$user-$mode` (the concrete command printed when the key is
-generated), or through `sudo npm exec arrsync@latest -k`.
+generated), or by running arrsync (with sudo) and choosing List private key
+contents.
 
 Two directories are created on the Server in the configured user's home
 directory: the `read` directory, where Clients can download files from, and the
@@ -116,21 +119,23 @@ lists of IP addresses for Read and Write access.
 
 ## 2. Configure the Client(s)
 
-On each Client, just run:
+On each Client, again just run:
 
 ```
-npm exec arrsync@latest -c
+npm exec arrsync@latest
 ```
+
+And choose Configure Client.
 
 No sudo needed here, since things get configured for the logged-in user.
 
 You'll be prompted to provide the needed configuration values. Alternatively,
 most variables can be passed as command options (see the [usage](./usage) file,
-or run `npm exec arrsync@latest -H`).
+or choose Help.
 
 On configuring the Client, you'll need to paste in the **contents of the
 _private_ key files** that were generated on the Server. To list these, run
-`sudo npm exec arrsync@latest -k` on the Server.
+arrsync on the Server (with sudo) and choose List private key contents.
 
 When a Client only needs Read access, and not Write (or the other way around)
 just hit Enter without pasting anything for the appropriate key, to render an

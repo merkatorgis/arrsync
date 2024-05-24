@@ -1,7 +1,7 @@
 #!/bin/bash
 
 arrsync=$(basename "$0")
-exec="npm exec $arrsync@latest"
+exec="npm exec $arrsync@latest --"
 base=$(dirname "$0")
 [ "$(basename "$base")" = .bin ] && base=$base/../$arrsync
 base=$(realpath "$base")
