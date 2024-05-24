@@ -302,12 +302,25 @@ Help() {
     usage 0
 }
 
+Quit() {
+    exit 0
+}
+
+version() {
+    (
+        cd "$base" || exit
+        npm pkg get version
+    )
+}
+
+echo "$arrsync version $(version)"
 PS3="Select an action (type the number) : "
 [ "$action" ] || select action in \
     'Configure Server' \
     'Configure Client' \
     'List private key contents' \
-    'Help'; do
+    'Help' \
+    'Quit'; do
     case $REPLY in
     1)
         action=Server
@@ -320,6 +333,9 @@ PS3="Select an action (type the number) : "
         ;;
     4)
         action=Help
+        ;;
+    5)
+        action=Quit
         ;;
     *)
         action=
