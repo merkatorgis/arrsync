@@ -19,12 +19,11 @@ version() {
     echo "$arrsync version $version"
 }
 
-version
-
 usage() {
+    version
     export exec
     envsubst <"$base/usage"
-    exit "${1:-1}"
+    [ "$1" = 0 ] || exit 1
 }
 
 while getopts ":tHksch:u:p:r:w:" arg; do
@@ -316,13 +315,14 @@ Keys() {
 }
 
 Help() {
-    usage 0
+    usage 0 | more
 }
 
 Quit() {
     exit 0
 }
 
+[ "$action" = Help ] || version
 PS3="Select an action (type the number) : "
 [ "$action" ] || select action in \
     'Configure Server' \
