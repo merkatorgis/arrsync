@@ -101,8 +101,8 @@ Write access.
 
 Two **public/private key pairs** are generated (one to Read and one to Write).
 You'll need the contents of the _private_ key files when configuring the
-Clients, which you can find through `sudo cat <user's
-home>/.ssh/$host-$user-$mode` (the concrete command is printed when the key is
+Clients, which you can find through `sudo cat {user's
+home}/.ssh/$host-$user-$mode` (the concrete command is printed when the key is
 generated), or by running arrsync (with sudo) and choosing List private key
 contents.
 
@@ -209,6 +209,10 @@ or:
 ```
 grep '$user' /var/log/auth.log | grep 'sshd'
 ```
+
+This may tell you things like "User {user} from {IP} not allowed because not
+listed in
+[AllowUsers](https://manpages.ubuntu.com/manpages/noble/en/man5/sshd_config.5.html)".
 
 ## Arrsync versions
 
