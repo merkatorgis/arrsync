@@ -1,6 +1,6 @@
 # arrsync
 
-Pirate-proof filetransfer with rrsync (restricted rsync).
+Pirate-proof file transfer with rrsync (restricted rsync).
 
 # Use case
 
