@@ -156,7 +156,7 @@ Server() {
     user_sure() {
         user_exists || return
         read -rp \
-            "User $user already exists; continue anyway? [yN] : " \
+            "  User $user already exists; continue anyway? [yN] : " \
             sure
         [ "${sure,,}" = y ] || user=
     }
@@ -166,8 +166,8 @@ Server() {
     if ! user_exists; then
         which adduser >/dev/null ||
             error "command adduser not found"
-        echo "About to add the new user; you may press Enter to leave each user detail field"
-        echo "empty. Press any key to continue..."
+        echo "  About to add the new user; you may press Enter to leave each user detail field"
+        echo "  empty. Press any key to continue..."
         read -rsn 1
         adduser --disabled-password "$user" || exit
     fi
@@ -228,7 +228,7 @@ Client() {
         ssh-keyscan "$host" -p "$port" >/dev/null 2>&1 &&
             return
         read -rp \
-            "SSH not answering at $host:$port; continue anyway? [yN] : " \
+            "  SSH not answering at $host:$port; continue anyway? [yN] : " \
             sure
         [ "${sure,,}" = y ] ||
             host=
@@ -268,15 +268,22 @@ Client() {
             echo "$REPLY" >>"$temp_key"
         done
         echo
-        # Write the collected key content (if any).
-        if [ -s "$temp_key" ]; then
+        # Write the collected key content, if any.
+        [ -s "$temp_key" ] &&
             cat "$temp_key" >"$IdentityFile"
-            [ "$mode" = read ] &&
-                echo "Download files with e.g. rsync -avz $Host: ."
-            [ "$mode" = write ] &&
-                echo "Upload files with e.g. rsync -avz . $Host:"
-        fi
         rm "$temp_key"
+        # If nothing was written, a possible earlier key remains.
+        [ -s "$IdentityFile" ] &&
+            case $mode in
+            read)
+                echo "  Download files with e.g. rsync -avz $Host: ."
+                ;;
+            write)
+                echo "  Upload files with e.g. rsync -avz . $Host:"
+                ;;
+            esac
+        # Create the key file even if we didn't get the key content; user may
+        # later add it manually.
         touch "$IdentityFile"
         chmod 600 "$IdentityFile"
     done
