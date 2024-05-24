@@ -216,5 +216,5 @@ It's important to configure both the Server and its Clients with the same
 arrsync version. So maybe you want to update the Server's version before
 configuring a new Client.
 
-You may also choose to target a specific version, e.g. `npm exec arrsync@0.0.1`.
+You may also choose to target a specific version, e.g. `npm exec arrsync@0.0.2`.
 Another stragegy could be to always use `npm exec arrsync@latest`.
