@@ -205,15 +205,15 @@ or:
 grep '$user' /var/log/auth.log | grep 'sshd'
 ```
 
-## Npm update
+## Arrsync versions
 
 Once you've run `npm exec arrsync`, the current _version_ of the arrsync tool is
 installed, and that same version is run the next time.
 
-To update arrsync to the latest version, run `npm update arrsync`.
+To update arrsync to the latest version, run `npm exec arrsync@latest`.
 
 It's important to configure both the Server and its Clients with the same
-arrsync version. So maybe you want to update the Server's version before
+version of arrsync. So maybe you want to update the Server's version before
 configuring a new Client.
 
 You may also choose to target a specific version, e.g. `npm exec arrsync@0.0.2`.
