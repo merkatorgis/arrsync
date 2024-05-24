@@ -83,7 +83,7 @@ https://download.samba.org/pub/rsync/rrsync.1.
 On the Server, just run:
 
 ```
-sudo npm exec arrsync -s
+sudo npm exec arrsync@latest -s
 ```
 
 Sudo is needed since we configure things for a another user (normally even a new
@@ -91,7 +91,7 @@ user, that the tool will create for you).
 
 You'll be prompted to provide the needed configuration values. Alternatively,
 all variables can be passed as command options. See the [usage](./usage) file
-for details, or run `npm exec arrsync -H` for help.
+for details, or run `npm exec arrsync@latest -H` for help.
 
 You'll be asked to provide a list of the (public) **IP addresses of the Client
 nodes** that you want to allow Read access, and a second list of addresses for
@@ -101,7 +101,7 @@ Two **public/private key pairs** are generated (one to Read and one to Write).
 You'll need the contents of the _private_ key files when configuring the
 Clients, which you can find through `sudo cat <user's
 home>/.ssh/$host-$user-$mode` (the concrete command printed when the key is
-generated), or through `sudo npm exec arrsync -k`.
+generated), or through `sudo npm exec arrsync@latest -k`.
 
 Two directories are created on the Server in the configured user's home
 directory: the `read` directory, where Clients can download files from, and the
@@ -119,18 +119,18 @@ lists of IP addresses for Read and Write access.
 On each Client, just run:
 
 ```
-npm exec arrsync -c
+npm exec arrsync@latest -c
 ```
 
 No sudo needed here, since things get configured for the logged-in user.
 
 You'll be prompted to provide the needed configuration values. Alternatively,
 most variables can be passed as command options (see the [usage](./usage) file,
-or run `npm exec arrsync -H`).
+or run `npm exec arrsync@latest -H`).
 
 On configuring the Client, you'll need to paste in the **contents of the
 _private_ key files** that were generated on the Server. To list these, run
-`sudo npm exec arrsync -k` on the Server.
+`sudo npm exec arrsync@latest -k` on the Server.
 
 When a Client only needs Read access, and not Write (or the other way around)
 just hit Enter without pasting anything for the appropriate key, to render an
@@ -207,14 +207,9 @@ grep '$user' /var/log/auth.log | grep 'sshd'
 
 ## Arrsync versions
 
-Once you've run `npm exec arrsync`, the current _version_ of the arrsync tool is
-installed, and that same version is run the next time.
-
-To update arrsync to the latest version, run `npm exec arrsync@latest`.
+Each time you run `npm exec arrsync@latest`, npm checks whether there's a newer
+version, and if so, installs it and use that version.
 
 It's important to configure both the Server and its Clients with the same
-version of arrsync. So maybe you want to update the Server's version before
-configuring a new Client.
-
-You may also choose to target a specific version, e.g. `npm exec arrsync@0.0.2`.
-Another stragegy could be to always use `npm exec arrsync@latest`.
+version of arrsync. You may choose to target a specific version, e.g. `npm exec
+arrsync@0.0.4`.
