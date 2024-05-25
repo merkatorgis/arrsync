@@ -53,10 +53,12 @@ sudo apt update
 sudo apt install npm
 ```
 
+Now you can use `npx` ("npm execute") to run npm packages without any further
+installation, as in `npx arrsync@latest`.
+
 Alternatively, if you don't want to install npm, clone the
 [repo](https://github.com/merkatorgis/arrsync) from GitHub, and run the
-`arrsync` script from there, wheras with npm you could just run `npm exec
-arrsync`, without having to clone it first.
+`arrsync` script from there.
 
 ## (r)rsync
 
@@ -83,7 +85,7 @@ https://download.samba.org/pub/rsync/rrsync.1.
 On the Server, just run:
 
 ```
-sudo npm exec arrsync@latest
+sudo npx arrsync@latest
 ```
 
 And choose the Configure Server menu item.
@@ -93,7 +95,7 @@ user, that the tool will create for you).
 
 You'll be prompted to provide the needed configuration values. Alternatively,
 all variables can be passed as command options. See the [usage](./usage) file
-for details, or run arrsync and choose Help menu item.
+for details, or run arrsync and choose the Help menu item.
 
 You'll be asked to provide a list of the (public) **IP addresses of the Client
 nodes** that you want to allow Read access, and a second list of addresses for
@@ -114,15 +116,15 @@ configuring [rrsync](https://download.samba.org/pub/rsync/rrsync.1) in the
 user's [authorized_keys](https://www.ssh.com/academy/ssh/authorized-keys-file)
 file.
 
-That `authorized_keys` file is the place where you can later make changes to the
-lists of IP addresses for Read and Write access.
+That file `{user's home}/.shh/authorized_keys` is the place where you can later
+make changes to the lists of IP addresses for Read and Write access.
 
 ## 2. Configure the Client(s)
 
 On each Client, just run:
 
 ```
-npm exec arrsync@latest
+npx arrsync@latest
 ```
 
 And choose Configure Client.
@@ -216,9 +218,9 @@ listed in
 
 ## Arrsync versions
 
-Each time you run `npm exec arrsync@latest`, npm checks whether there's a newer
+Each time you run `npx arrsync@latest`, npm checks whether there's a newer
 version, and if so, installs it and use that version.
 
 It's important to configure both the Server and its Clients with the same
-version of arrsync. You may choose to target a specific version, e.g. `npm exec
-arrsync@0.0.7`.
+version of arrsync. You may choose to target a specific version, e.g. `npx
+arrsync@0.0.12`.
