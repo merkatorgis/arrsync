@@ -14,5 +14,17 @@
   "bugs": {
     "url": "https://github.com/merkatorgis/arrsync/issues"
   },
-  "homepage": "https://github.com/merkatorgis/arrsync#readme"
+  "homepage": "https://github.com/merkatorgis/arrsync#readme",
+  "keywords": [
+    "rrsync",
+    "restricted",
+    "rsync",
+    "scp",
+    "secure",
+    "copy",
+    "remote",
+    "file",
+    "transfer",
+    "ssh"
+  ]
 }
