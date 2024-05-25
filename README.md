@@ -58,7 +58,7 @@ installation, as in `npx arrsync@latest`.
 
 Alternatively, if you don't want to install npm, clone the
 [repo](https://github.com/merkatorgis/arrsync) from GitHub, and run the
-`arrsync` script from there.
+[arrsync](./arrsync) script from there.
 
 ## (r)rsync
 
