@@ -1,6 +1,6 @@
 {
   "name": "arrsync",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Pirate-proof file transfer with rrsync (restricted rsync). Created by https://www.merkator.com",
   "bin": {
     "arrsync": "arrsync"
