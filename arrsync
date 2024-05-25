@@ -32,21 +32,9 @@ while getopts ":tHksch:u:p:r:w:" arg; do
         # -t = trace; for debugging
         set -x
         ;;
-    H)
+    H | k | s | c)
         [ "$action" ] && usage
-        action=Help
-        ;;
-    k)
-        [ "$action" ] && usage
-        action=Keys
-        ;;
-    s)
-        [ "$action" ] && usage
-        action=Server
-        ;;
-    c)
-        [ "$action" ] && usage
-        action=Client
+        action=$arg
         ;;
     h)
         host=$OPTARG
@@ -135,7 +123,8 @@ home() {
         error "can't find home directory for user $user"
 }
 
-Server() {
+# Configure Server
+s() {
     which ssh-keygen >/dev/null ||
         error "command ssh-keygen not found; is the ssh client installed?"
 
@@ -219,7 +208,8 @@ Server() {
     done
 }
 
-Client() {
+# Configure Client
+c() {
     host_sure() {
         [ "$host" ] ||
             return
@@ -308,7 +298,8 @@ Client() {
     chmod 600 "$config"
 }
 
-Keys() {
+# List private key contents
+k() {
     root
     user
     home
@@ -321,15 +312,12 @@ Keys() {
     done
 }
 
-Help() {
+# Help
+H() {
     usage 0 | more
 }
 
-Quit() {
-    exit 0
-}
-
-[ "$action" = Help ] || version
+[ "$action" = H ] || version
 PS3="Select an action (type the number) : "
 [ "$action" ] || select action in \
     'Configure Server' \
@@ -339,19 +327,19 @@ PS3="Select an action (type the number) : "
     'Quit'; do
     case $REPLY in
     1)
-        action=Server
+        action=s
         ;;
     2)
-        action=Client
+        action=c
         ;;
     3)
-        action=Keys
+        action=k
         ;;
     4)
-        action=Help
+        action=H
         ;;
     5)
-        action=Quit
+        exit 0
         ;;
     *)
         action=
